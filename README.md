@@ -1,2 +1,5 @@
-# Unity3D_2DShapeShaderDrawing
-Basic shape drawing with Shader.
+# Unity_Drawing2DShapeShader
+
+Unity のシェーダ(HLSL/Cg)を使って、シンプルな2次元の形状を描画するサンプルです。
+
+Drawing simple 2D shape with Shader in Unity.

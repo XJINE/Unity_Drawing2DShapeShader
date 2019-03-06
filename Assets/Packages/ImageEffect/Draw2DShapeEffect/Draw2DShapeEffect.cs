@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 using UnityEngine;
 
 [ExecuteInEditMode]
-public class Drawing2DShapeEffect : ImageEffectBase
+public class Draw2DShapeEffect : ImageEffectBase
 {
     #region Enum
 
@@ -32,21 +32,19 @@ public class Drawing2DShapeEffect : ImageEffectBase
 
     #region Field
 
-    private ComputeBuffer   shapeBuffer;
-    public  List<ShapeData> shapes;
-
     private new Camera camera;
 
+    private ComputeBuffer shapeBuffer;
+
+    // NOTE:
+    // shapes must be initialized in Field.
+    // Because shapes is not initialized in sometimes when initialized in Start() or Awake().
+
+    private readonly SortedList<int, List<ShapeData>> shapes = new SortedList<int, List<ShapeData>>();
+
+    private int shapeBufferID;
+
     #endregion Field
-
-    #region Property
-
-    //public IReadOnlyList<ShapeData> Shapes
-    //{
-    
-    //}
-
-    #endregion Property
 
     #region Method
 
@@ -54,27 +52,49 @@ public class Drawing2DShapeEffect : ImageEffectBase
     {
         base.Start();
         this.camera = base.GetComponent<Camera>();
+        this.shapeBufferID = Shader.PropertyToID("_ShapeBuffer");
     }
 
     protected override void OnRenderImage(RenderTexture src, RenderTexture dest)
     {
         if (this.shapes.Count != 0)
         {
-            this.shapeBuffer = new ComputeBuffer(this.shapes.Count, Marshal.SizeOf(typeof(ShapeData)));
-            this.shapeBuffer.SetData(this.shapes);
+            List<ShapeData> shapes = new List<ShapeData>();
+
+            foreach (var data in this.shapes)
+            {
+                shapes.AddRange(data.Value);
+            }
+
+            this.shapeBuffer = new ComputeBuffer(shapes.Count, Marshal.SizeOf(typeof(ShapeData)));
+            this.shapeBuffer.SetData(shapes);
+
+            base.material.SetBuffer(this.shapeBufferID, this.shapeBuffer);
         }
 
-        base.material.SetBuffer("_ShapeBuffer", this.shapeBuffer);
-
         base.OnRenderImage(src, dest);
+
+        if (this.shapeBuffer != null)
+        {
+            this.shapeBuffer.Release();
+        }
     }
 
     protected void OnDestroy()
     {
         if (this.shapeBuffer != null)
         {
+            this.shapeBuffer.Release();
             this.shapeBuffer.Dispose();
             this.shapeBuffer = null;
+        }
+    }
+
+    public void Clear()
+    {
+        if (this.shapes != null)
+        {
+            this.shapes.Clear();
         }
     }
 
@@ -87,13 +107,13 @@ public class Drawing2DShapeEffect : ImageEffectBase
     {
         ShapeData shape = new ShapeData()
         {
-            shape      = Shape.Circle,
+            shape     = Shape.Circle,
             position  = new Vector4(posInScreen.x, posInScreen.y, 0, 0),
             parameter = new Vector4(radius, 0, 0, 0),
             color     = color
         };
 
-        DrawShape(shape);
+        DrawShape(shape, index);
     }
 
     public void DrawRing(Vector3 posInWorld, Color color, float innerRadius, float outerRadius, int index = -1)
@@ -105,13 +125,13 @@ public class Drawing2DShapeEffect : ImageEffectBase
     {
         ShapeData shape = new ShapeData()
         {
-            shape      = Shape.Ring,
+            shape     = Shape.Ring,
             position  = new Vector4(posInScreen.x, posInScreen.y, 0, 0),
             parameter = new Vector4(innerRadius, outerRadius, 0, 0),
             color = color
         };
 
-        DrawShape(shape);
+        DrawShape(shape, index);
     }
 
     public void DrawSqare(Vector3 posInWorld, Color color, float size, int index = -1)
@@ -123,13 +143,13 @@ public class Drawing2DShapeEffect : ImageEffectBase
     {
         ShapeData shape = new ShapeData()
         {
-            shape      = Shape.Sqare,
+            shape     = Shape.Sqare,
             position  = new Vector4(posInScreen.x, posInScreen.y, 0, 0),
             parameter = new Vector4(size, 0, 0, 0),
             color     = color
         };
 
-        DrawShape(shape);
+        DrawShape(shape, index);
     }
 
     public void DrawRect(Vector3 posInWorld1, Vector3 posInWorld2, Color color, int index = -1)
@@ -150,13 +170,19 @@ public class Drawing2DShapeEffect : ImageEffectBase
             color     = color
         };
 
-        DrawShape(shape);
+        DrawShape(shape, index);
     }
 
-    public void DrawShape(ShapeData shape, int index = -1)
+    public void DrawShape(ShapeData shape, int index = 0)
     {
-        index = Mathf.Max(0, Mathf.Min(shapes.Count, index));
-        this.shapes.Insert(index, shape);
+        if (this.shapes.ContainsKey(index))
+        {
+            this.shapes[index].Add(shape);
+        }
+        else
+        {
+            this.shapes.Add(index, new List<ShapeData>(){ shape });
+        }
     }
 
     #endregion Method

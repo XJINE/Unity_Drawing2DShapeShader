@@ -1,4 +1,4 @@
-﻿Shader "Hidden/Drawing2DShapeEffect"
+﻿Shader "Hidden/Draw2DShapeEffect"
 {
     Properties
     {

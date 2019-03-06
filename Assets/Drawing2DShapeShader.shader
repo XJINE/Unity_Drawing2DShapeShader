@@ -1,4 +1,4 @@
-﻿Shader "Hidden/Drawing2DShapeShader"
+﻿Shader "Hidden/Drawing2DShapeEffect"
 {
     Properties
     {
@@ -16,68 +16,83 @@
             
             #include "UnityCG.cginc"
 
+            #pragma target 5.0
             #pragma vertex vert_img
             #pragma fragment frag
 
+            struct Shape
+            {
+                int    type;
+                float4 pos;
+                float4 param;
+                float4 color;
+            };
+
+            StructuredBuffer<Shape> _ShapeBuffer;
+
             sampler2D _MainTex;
 
-            static const fixed4 white = fixed4(1.0, 1.0, 1.0, 1.0);
-            static const fixed4 red   = fixed4(1.0, 0.0, 0.0, 1.0);
-            static const fixed4 green = fixed4(0.0, 1.0, 0.0, 1.0);
-            static const fixed4 blue  = fixed4(0.0, 0.0, 1.0, 1.0);
-
-            void drawCircle (float2 inputPos, float2 centerPos, float radius,
-                             fixed4 color, float aspectRatio, inout fixed4 destination)
+            void drawCircle (float2 inputPos, float2 centerPos, float radius, fixed4 color, inout fixed4 dest)
             {
-                inputPos.x  *= aspectRatio;
-                centerPos.x *= aspectRatio;
-
                 float l = length(inputPos - centerPos);
 
                 if (l < radius)
                 {
-                    destination = color;
+                    dest = color;
                 }
             }
 
-            void drawRing(float2 inputPos, float2 centerPos, float innerRadius, float outerRadius,
-                          fixed4 color, float aspectRatio, inout fixed4 destination)
+            void drawRing (float2 inputPos, float2 centerPos, float innerRad, float outerRad, fixed4 color, inout fixed4 dest)
             {
-                inputPos.x  *= aspectRatio;
-                centerPos.x *= aspectRatio;
-
                 float l = length(inputPos - centerPos);
 
-                if (innerRadius < l && l < outerRadius)
+                if (innerRad < l && l < outerRad)
                 {
-                    destination = color;
+                    dest = color;
                 }
             }
 
-            void drawSqare (float2 inputPos, float2 centerPos, float length,
-                            fixed4 color, float aspectRatio, inout fixed4 destination)
+            void drawSqare (float2 inputPos, float2 centerPos, float size, fixed4 color, inout fixed4 dest)
             {
-                inputPos.x  *= aspectRatio;
-                centerPos.x *= aspectRatio;
-
-                float2 q = (inputPos - centerPos) / length;
+                float2 q = (inputPos - centerPos) / size;
 
                 if (abs(q.x) < 1.0 && abs(q.y) < 1.0) 
                 {
-                    destination = color;
+                    dest = color;
                 }
             }
 
-            fixed4 frag (v2f_img i) : SV_Target
+            float4 frag (v2f_img input) : SV_Target
             {
-                fixed4 destination = white;
-                float  aspectRatio = _ScreenParams.x / _ScreenParams.y;
+                float4 dest   = tex2D(_MainTex, input.uv);;
+                float  aspect = _ScreenParams.x / _ScreenParams.y;
 
-                drawCircle(i.uv, float2(0.5, 0.5), 0.3, red, aspectRatio, destination);
-                drawSqare(i.uv, float2(0.3, 0.3), 0.1, green, aspectRatio, destination);
-                drawRing(i.uv, float2(0.65, 0.3), 0.1, 0.2, blue, aspectRatio, destination);
+                float2 inputPos = float2(input.uv.x * aspect, input.uv.y);
+                float2 centerPos;
 
-                return destination;
+                Shape shape;
+                int shapeLength = (int)_ShapeBuffer.Length;
+
+                for (int i = 0; i < shapeLength; i++)
+                {
+                    shape  = _ShapeBuffer[i];
+                    centerPos = float2(shape.pos.x * aspect, shape.pos.y);
+
+                    switch(shape.type)
+                    {
+                        case 0:
+                            drawCircle(inputPos, centerPos, shape.param.x, shape.color, dest);
+                            break;
+                        case 1:
+                            drawRing  (inputPos, centerPos, shape.param.x, shape.param.y, shape.color, dest);
+                            break;
+                        default:
+                            drawSqare (inputPos, centerPos, shape.param.x, shape.color, dest);
+                            break;
+                    }
+                }
+
+                return dest;
             }
 
             ENDCG
